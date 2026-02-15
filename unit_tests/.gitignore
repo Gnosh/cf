@@ -1,0 +1,11 @@
+# Build artifacts
+*.o
+*.gcno
+*.gcda
+*.gcov
+cf_test_runner
+test_single
+test_cb
+test_pb
+test_app
+test_dbg
