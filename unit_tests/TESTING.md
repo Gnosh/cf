@@ -6,7 +6,7 @@ This test suite provides standalone unit tests for NASA's CF (CCSDS File Deliver
 application, version 2.2.1. It was designed to work independently of the full cFS build
 system, allowing tests to be compiled and run without the full cFE, OSAL, or CFDP engine.
 
-**Test Results:** 460 tests, 913 assertions, 0 failures
+**Test Results:** 460 tests, 718 assertions, 0 failures
 
 ## Architecture and Design Decisions
 
@@ -72,7 +72,18 @@ BUGS_AND_IMPROVEMENTS.md) but would cause immediate crashes in the test runner, 
 us from testing the rest of the function's logic. Disabling the protector allows the tests
 to exercise the intended code paths while the bugs are documented separately.
 
-### 6. Test Framework
+### 6. Volatile Global Loop Counter in Test Runner
+
+**Decision:** The test runner's loop index (`UtTest_RunIndex`) is a `volatile` global
+variable rather than a stack-local `uint32 i`.
+
+**Rationale:** CF source functions contain buffer overflow bugs that corrupt stack frames.
+When the loop counter lived on the stack, overflows from tests like CF_WakeupProcessing
+would reset `i` to a previous value, causing the test suite to loop infinitely (48+ million
+lines of output). Making the counter a volatile global places it in BSS, immune to stack
+corruption, so the runner always progresses forward through all 460 tests.
+
+### 7. Test Framework
 
 **Decision:** Created a simple custom test framework (test_framework.h) with UtTest_Add,
 UtAssert_True, UtAssert_IntEq, UtAssert_StrEq, and UtAssert_MemCmp.
@@ -117,17 +128,14 @@ This overflows the local buffer by 32 bytes, corrupting the stack.
 
 ## Known Limitations
 
-1. **GCOV coverage data** may not be generated reliably due to a segfault that occurs
-   when stdout is redirected. Tests produce correct results when run with `stdbuf -oL`.
-
-2. **CF_DEBUG code paths** are not tested because the `CF_DEBUG` preprocessor macro is not
+1. **CF_DEBUG code paths** are not tested because the `CF_DEBUG` preprocessor macro is not
    defined during test compilation. These paths are debug-only and contain only printf calls.
 
-3. **Some CF_Indication paths** are exercised but certain deep branches (e.g., the
+2. **Some CF_Indication paths** are exercised but certain deep branches (e.g., the
    CF_MoveDwnNodeActiveToHistory path with complex linked-list state) may not achieve
    100% branch coverage due to the complexity of setting up the exact queue state needed.
 
-4. **Thread safety** is not tested. The CF application runs in a single cFE task context
+3. **Thread safety** is not tested. The CF application runs in a single cFE task context
    in flight, but the CFDP engine callbacks could theoretically be called from different
    contexts.
 
@@ -136,7 +144,7 @@ This overflows the local buffer by 32 bytes, corrupting the stack.
 ```bash
 cd unit_tests
 make clean && make all    # Build everything
-stdbuf -oL ./cf_test_runner   # Run all 460 tests
+./cf_test_runner          # Run all 460 tests
 make gcov                 # Generate coverage reports (if gcda files exist)
 ```
 

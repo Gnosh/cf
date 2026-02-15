@@ -56,34 +56,39 @@ boolean UtAssert(boolean Expression, char *Description, char *File, uint32 Line)
 
 /*
  * UtTest_Run - Execute all registered tests
+ *
+ * NOTE: The loop index is a volatile global instead of a stack local because
+ * CF source code contains buffer overflow bugs that corrupt the stack frame.
+ * With a stack-local loop counter, overflows reset 'i' causing infinite loops.
+ * A volatile global survives stack corruption and keeps the runner progressing.
  */
+static volatile uint32 UtTest_RunIndex = 0;
+
 int UtTest_Run(void)
 {
-    uint32 i;
-
     printf("\n===== CF Unit Test Suite =====\n");
     printf("Running %u test(s)...\n\n", (unsigned int)UtTestCount);
 
-    for (i = 0; i < UtTestCount; i++)
+    for (UtTest_RunIndex = 0; UtTest_RunIndex < UtTestCount; UtTest_RunIndex++)
     {
-        printf("--- %s ---\n", UtTestList[i].Name);
+        printf("--- %s ---\n", UtTestList[UtTest_RunIndex].Name);
 
         /* Run setup if provided */
-        if (UtTestList[i].Setup != NULL)
+        if (UtTestList[UtTest_RunIndex].Setup != NULL)
         {
-            UtTestList[i].Setup();
+            UtTestList[UtTest_RunIndex].Setup();
         }
 
         /* Run the test */
-        if (UtTestList[i].Test != NULL)
+        if (UtTestList[UtTest_RunIndex].Test != NULL)
         {
-            UtTestList[i].Test();
+            UtTestList[UtTest_RunIndex].Test();
         }
 
         /* Run teardown if provided */
-        if (UtTestList[i].Teardown != NULL)
+        if (UtTestList[UtTest_RunIndex].Teardown != NULL)
         {
-            UtTestList[i].Teardown();
+            UtTestList[UtTest_RunIndex].Teardown();
         }
     }
 
